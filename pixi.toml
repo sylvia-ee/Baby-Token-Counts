@@ -1,0 +1,16 @@
+[workspace]
+authors = ["Sylvia E <sylviae2@illinois.edu>"]
+channels = ["conda-forge"]
+name = "Baby-Token-Counts"
+platforms = ["osx-arm64", "osx-64", "linux-64", "win-64"]
+version = "0.1.0"
+
+[tasks]
+start-engine = "ollama serve"
+download-model = "ollama pull llama3.1"
+
+[dependencies]
+python = "3.11.*"
+pandas = ">=2.2.0"
+requests = ">=2.31.0"
+ollama = ">=0.1.0"

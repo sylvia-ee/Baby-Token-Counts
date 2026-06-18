@@ -1,0 +1,14 @@
+category,excl_reason
+games_routines,non-noun-cat
+action_words,non-noun-cat
+descriptive_words,non-noun-cat
+time_words,non-noun-cat
+locations,non-noun-cat
+descriptive_verbs,non-noun-cat
+pronouns,non-noun-cat
+helping_verbs,non-noun-cat
+sounds,non-noun-cat
+quantifiers,non-noun-cat
+connecting_words,non-noun-cat
+NA,non-noun-cat
+question_words,non-noun-cat
