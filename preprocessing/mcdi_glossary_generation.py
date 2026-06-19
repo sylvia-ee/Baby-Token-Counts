@@ -1,5 +1,15 @@
+import re
 from string_ops import *
 import pandas as pd
+
+GRAMMAR_GENERATORS = {
+    "singular_noun": singular_generator,
+    "plural_noun": plural_generator,
+    "possessive": possessive_generator,
+    "plural_possessive": plural_possessive_generator,
+    "dumb_plural": dumb_plural_generator,
+    "dumb_plural_possessive": dumb_plural_poss_generator,
+}
 
 def generate_bases(mcdi_string):
     """
@@ -38,6 +48,47 @@ def apply_manual_grammar(path_to_manual_grammar, df):
     df = df.merge(manual_grammar, on=["mcdi_id", "base"], how="left", suffixes=("", "_manual"))
     df["grammar"] = df["grammar_manual"].combine_first(df["grammar"])
     df = df.drop(columns="grammar_manual")
+    return df
+
+def generate_alt_forms(base, existing_grammar):
+
+    if not isinstance(base, str) or re.search(r'\s', base):
+        return [(base, existing_grammar)]
+
+    forms = {}
+    for tag in str(existing_grammar).split(", "):
+        forms.setdefault(base, set()).add(tag)
+
+    for tag, generator in GRAMMAR_GENERATORS.items():
+        alt = generator(base)
+        forms.setdefault(alt, set()).add(tag)
+
+    return [(alt, ", ".join(sorted(tags))) for alt, tags in forms.items()]
+
+def generate_alts(df, inclusions_df=False):
+
+    # 1. copy base vals to alt
+    df["alt"] = df["base"]
+
+    # 2. include manual inclusions
+    if inclusions_df is not False:
+        included = df.merge(
+            inclusions_df, on=["mcdi", "base"], how="inner", suffixes=("", "_incl")
+        )
+        included["base"] = included["alt_incl"]
+        included["alt"] = included["alt_incl"]
+        included["grammar"] = included["grammar_incl"]
+        included = included.drop(columns=["alt_incl", "grammar_incl"])
+        df = pd.concat([df, included], ignore_index=True)
+
+    # 3. generate grammatical forms for alts
+    df["alt_grammar"] = df.apply(
+        lambda row: generate_alt_forms(row["base"], row["grammar"]), axis=1
+    )
+    df = df.explode("alt_grammar", ignore_index=True)
+    df[["alt", "grammar"]] = pd.DataFrame(df["alt_grammar"].tolist(), index=df.index)
+    df = df.drop(columns="alt_grammar")
+
     return df
 
 
@@ -79,7 +130,8 @@ mcdi_ibi_df = apply_word_excl(word_excl_path, mcdi_ibi_df)
 mcdi_ibi_df["grammar"] = mcdi_ibi_df["base"].apply(get_grammatical_profile)
 mcdi_ibi_df = apply_manual_grammar(manual_grammar_path, mcdi_ibi_df)
 
-# 5. 
+# 5. generate alts
+mcdi_ibi_df = generate_alts(mcdi_ibi_df, word_incl_df)
 
 mcdi_ibi_df = mcdi_ibi_df.sort_values(by="base")
 mcdi_ibi_df.to_csv("test.csv", index=False)

@@ -37,9 +37,6 @@ def split_variants(string):
     split_list = [word.strip() for word in string.split('/')]
     return split_list
 
-
-
-
 # grammar
 
 ## classifier
