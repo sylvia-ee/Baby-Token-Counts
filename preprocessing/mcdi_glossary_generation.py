@@ -74,20 +74,26 @@ def generate_alt_forms(base, existing_grammar):
 def apply_word_incl(path_to_w_incl, df):
     word_incl = pd.read_csv(path_to_w_incl)[["mcdi", "base", "alt", "grammar"]]
     included = df.merge(word_incl, on=["mcdi", "base"], how="inner", suffixes=("", "_incl"))
-    included["base"] = included["alt_incl"]
     included["alt"] = included["alt_incl"]
     included["grammar"] = included["grammar_incl"]
     included = included.drop(columns=["alt_incl", "grammar_incl"])
     return pd.concat([df, included], ignore_index=True)
 
+def merge_grammar_tags(grammars):
+    tags = set()
+    for grammar in grammars:
+        tags.update(str(grammar).split(", "))
+    return ", ".join(sorted(tags))
+
 def generate_alts(df):
 
-    # 1. copy base vals to alt
-    df["alt"] = df["base"]
+    # 1. default alt to base for rows without an inclusion-provided alt;
+    # base itself must never change after the initial base-creation step
+    df["alt"] = df["alt"].fillna(df["base"])
 
     # 2. generate grammatical forms for alts
     df["alt_grammar"] = df.apply(
-        lambda row: generate_alt_forms(row["base"], row["grammar"]), axis=1
+        lambda row: generate_alt_forms(row["alt"], row["grammar"]), axis=1
     )
     df = df.explode("alt_grammar", ignore_index=True)
     df[["alt", "grammar"]] = pd.DataFrame(df["alt_grammar"].tolist(), index=df.index)
@@ -97,6 +103,14 @@ def generate_alts(df):
     compound_alts = df[df["alt"].str.contains(" ", na=False)].copy()
     compound_alts["alt"] = compound_alts["alt"].str.replace(" ", "+")
     df = pd.concat([df, compound_alts], ignore_index=True)
+
+    # 4. different paths (e.g. an explicit "+"-joined inclusion and the plus-joining
+    # of a space-joined inclusion) can land on the same (mcdi, base, alt); collapse
+    # those into one row, unioning their grammar tags so none are lost
+    other_cols = [c for c in df.columns if c not in ("mcdi", "base", "alt", "grammar")]
+    df = df.groupby(["mcdi", "base", "alt"], as_index=False).agg(
+        grammar=("grammar", merge_grammar_tags), **{c: (c, "first") for c in other_cols}
+    )
 
     return df
 
