@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-COUNTS_PATH = "/Users/se/Projects/Baby-Token-Counts/data/counts.csv"
+COUNTS_PATH = "/Users/se/Projects/Baby-Token-Counts/data/counts_by_age.csv"
 
 # (canonical label, raw count column, log-transformed column) — the canonical
 # label is used for color/sort identity so it stays stable when the log toggle flips
@@ -119,7 +119,54 @@ INTRO_CAPTION_LINES = [
 ]
 st.caption("  \n".join(INTRO_CAPTION_LINES))
 
-counts_df = load_counts()
+counts_by_age_df = load_counts()
+
+available_ages = sorted(counts_by_age_df["age at count"].unique().tolist())
+default_age = 24 if 24 in available_ages else available_ages[len(available_ages) // 2]
+selected_age = st.selectbox(
+    "Age cutoff (months) — applies to both the scatter plot and the bar plot below",
+    available_ages,
+    index=available_ages.index(default_age),
+)
+counts_df = counts_by_age_df[counts_by_age_df["age at count"] == selected_age].drop(columns="age at count")
+
+st.header("β by age cutoff")
+st.caption(
+    "For each age cutoff, refits the avg. production vs. log frequency regression "
+    "(same as the scatter plot below) and tracks how β moves as more CHILDES data is included."
+)
+
+beta_trend_rows = []
+for age in available_ages:
+    age_slice = counts_by_age_df[counts_by_age_df["age at count"] == age]
+    age_base_df = (
+        age_slice[["mcdi", "avg_production"] + [log_col for _, _, log_col in METRIC_DEFS]]
+        .drop_duplicates(subset="mcdi")
+    )
+    for name, _, log_col in METRIC_DEFS:
+        if age_base_df[log_col].nunique() > 1:
+            beta, _intercept = np.polyfit(age_base_df[log_col], age_base_df["avg_production"], 1)
+        else:
+            beta = float("nan")
+        beta_trend_rows.append({"age": age, "metric": name, "beta": beta})
+beta_trend_df = pd.DataFrame(beta_trend_rows)
+
+beta_trend_chart = (
+    alt.Chart(beta_trend_df)
+    .mark_line(point=True)
+    .encode(
+        x=alt.X("age:Q", title="Age cutoff (months)"),
+        y=alt.Y("beta:Q", title="β (slope)"),
+        color=alt.Color(
+            "metric:N",
+            title="Count type",
+            scale=alt.Scale(domain=[name for name, _, _ in METRIC_DEFS], range=METRIC_COLORS),
+        ),
+        tooltip=["age", "metric", "beta"],
+    )
+    .properties(width=800, height=350)
+)
+st.altair_chart(beta_trend_chart, width="content")
 
 st.sidebar.header("Filters")
 st.sidebar.caption("These filters (and the MCDI word filter below) apply only to the "
