@@ -33,6 +33,18 @@ def load_counts():
     return pd.read_csv(COUNTS_PATH)
 
 
+def standardized_beta(x, y):
+    """Correlations for log frequency vs. production (MCDI). Betas have been standardized,
+    so interpret betas as comparable. Note that betas reflect cumulative input up to that age."""
+    x = np.asarray(x, dtype=float)
+    y = np.asarray(y, dtype=float)
+    x_std, y_std = x.std(), y.std()
+    if x_std == 0 or y_std == 0:
+        return float("nan")
+    beta, _intercept = np.polyfit((x - x.mean()) / x_std, (y - y.mean()) / y_std, 1)
+    return beta
+
+
 def numeric_range_filter(df, col, label, default_min=None):
     if df.empty:
         st.caption(f"{label}: no rows to filter")
@@ -99,100 +111,53 @@ def checkbox_list_filter(df, col, label, container, n_cols=2, searchable=False):
     return df[df[col].isin(selected)] if selected else df.iloc[0:0]
 
 
-st.set_page_config(page_title="CHILDES-MCDI Counts", layout="wide")
-st.title("MCDI-CHILDES Counts")
-
-INTRO_CAPTION_LINES = [
-    f"Source: {COUNTS_PATH}",
-    "Each MCDI word here is displayed with four kinds of counts:",
-    "• Total alt inclusive count: counts a word and all its possible forms, double-counting compound words",
-    "• Total alt exclusive count: counts a word and all its possible forms, without double-counting compound words",
-    "• Base inclusive count: counts only the canonical form of each word, double-counting compounds",
-    "• Base exclusive count: counts only the canonical form of each word, without double-counting compounds",
-    "The \"Use log-transformed counts\" toggle switches all of the above to their log-transformed values.",
-    "Four difference metrics are also available for sorting:",
-    "• Alt diff: total alt inclusive − total alt exclusive",
-    "• Base diff: base inclusive − base exclusive",
-    "• Alt-base exclusive diff: total alt exclusive − base exclusive",
-    "• Alt-base inclusive diff: total alt inclusive − base inclusive",
-    "Toggling the log-transform option switches these diffs to their log-difference versions too.",
-]
-st.caption("  \n".join(INTRO_CAPTION_LINES))
-
-counts_by_age_df = load_counts()
-
-available_ages = sorted(counts_by_age_df["age at count"].unique().tolist())
-default_age = 24 if 24 in available_ages else available_ages[len(available_ages) // 2]
-selected_age = st.selectbox(
-    "Age cutoff (months) — applies to both the scatter plot and the bar plot below",
-    available_ages,
-    index=available_ages.index(default_age),
-)
-counts_df = counts_by_age_df[counts_by_age_df["age at count"] == selected_age].drop(columns="age at count")
-
-st.header("β by age cutoff")
-st.caption(
-    "For each age cutoff, refits the avg. production vs. log frequency regression "
-    "(same as the scatter plot below) and tracks how β moves as more CHILDES data is included."
-)
-
-beta_trend_rows = []
-for age in available_ages:
-    age_slice = counts_by_age_df[counts_by_age_df["age at count"] == age]
-    age_base_df = (
-        age_slice[["mcdi", "avg_production"] + [log_col for _, _, log_col in METRIC_DEFS]]
-        .drop_duplicates(subset="mcdi")
+def page_beta_trend():
+    st.header("Standardized β by age cutoff")
+    st.caption(
+        "For each age cutoff, refits the avg. production vs. log frequency regression "
+        "(same as the scatter plot page) and tracks how standardized β moves as more "
+        "CHILDES data is included. Standardizing (z-scoring both variables before fitting) "
+        "puts every age cutoff and count type on the same scale, so the betas are comparable."
     )
-    for name, _, log_col in METRIC_DEFS:
-        if age_base_df[log_col].nunique() > 1:
-            beta, _intercept = np.polyfit(age_base_df[log_col], age_base_df["avg_production"], 1)
-        else:
-            beta = float("nan")
-        beta_trend_rows.append({"age": age, "metric": name, "beta": beta})
-beta_trend_df = pd.DataFrame(beta_trend_rows)
 
-beta_trend_chart = (
-    alt.Chart(beta_trend_df)
-    .mark_line(point=True)
-    .encode(
-        x=alt.X("age:Q", title="Age cutoff (months)"),
-        y=alt.Y("beta:Q", title="β (slope)"),
-        color=alt.Color(
-            "metric:N",
-            title="Count type",
-            scale=alt.Scale(domain=[name for name, _, _ in METRIC_DEFS], range=METRIC_COLORS),
-        ),
-        tooltip=["age", "metric", "beta"],
+    beta_trend_rows = []
+    for age in available_ages:
+        age_slice = counts_by_age_df[counts_by_age_df["age at count"] == age]
+        age_base_df = (
+            age_slice[["mcdi", "avg_production"] + [log_col for _, _, log_col in METRIC_DEFS]]
+            .drop_duplicates(subset="mcdi")
+        )
+        for name, _, log_col in METRIC_DEFS:
+            beta = standardized_beta(age_base_df[log_col], age_base_df["avg_production"])
+            beta_trend_rows.append({"age": age, "metric": name, "beta": beta})
+    beta_trend_df = pd.DataFrame(beta_trend_rows)
+
+    beta_trend_chart = (
+        alt.Chart(beta_trend_df)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("age:Q", title="Age cutoff (months)"),
+            y=alt.Y("beta:Q", title="Standardized β"),
+            color=alt.Color(
+                "metric:N",
+                title="Count type",
+                scale=alt.Scale(domain=[name for name, _, _ in METRIC_DEFS], range=METRIC_COLORS),
+            ),
+            tooltip=["age", "metric", "beta"],
+        )
+        .properties(width=800, height=350)
     )
-    .properties(width=800, height=350)
-)
-st.altair_chart(beta_trend_chart, width="content")
+    st.altair_chart(beta_trend_chart, width="content")
 
-st.sidebar.header("Filters")
-st.sidebar.caption("These filters (and the MCDI word filter below) apply only to the "
-                    "\"Summary statistics\" bar plot, not the production-vs-frequency scatter plot.")
 
-filtered_df = counts_df.copy()
-filtered_df = checkbox_list_filter(filtered_df, "category", "Category", st.sidebar, n_cols=2)
-filtered_df = checkbox_list_filter(filtered_df, "grammar", "Grammar", st.sidebar, n_cols=1)
+def page_scatter():
+    st.header("Avg. production vs. frequency by count type")
+    st.caption("Reflects the age cutoff and MCDI word filter from the sidebar.")
 
-st.sidebar.subheader("Count ranges")
-for col, label, default_min in [
-    ("total_alt_incl_count", "Total alt inclusive count", 1),
-    ("total_alt_excl_count", "Total alt exclusive count", 1),
-    ("base_incl_count", "Base inclusive count", 1),
-    ("base_excl_count", "Base exclusive count", 1),
-    ("avg_production", "Avg. production", None),
-]:
-    with st.sidebar:
-        filtered_df = numeric_range_filter(filtered_df, col, label, default_min=default_min)
+    if counts_df.empty:
+        st.warning("No data available.")
+        return
 
-st.header("Avg. production vs. frequency by count type")
-st.caption("Uses the full dataset, independent of the sidebar/MCDI word filters above.")
-
-if counts_df.empty:
-    st.warning("No data available.")
-else:
     scatter_base_df = (
         counts_df[["mcdi", "avg_production"] + [log_col for _, _, log_col in METRIC_DEFS]]
         .drop_duplicates(subset="mcdi")
@@ -207,66 +172,80 @@ else:
 
     if not visible_scatter_metrics:
         st.info("Toggle on at least one count type to plot.")
-    else:
-        scatter_rows = []
-        betas = []
-        for name, log_col in visible_scatter_metrics:
-            sub = scatter_base_df[["mcdi", "avg_production", log_col]].rename(
-                columns={log_col: "frequency"}
-            )
-            sub["metric"] = name
-            scatter_rows.append(sub)
+        return
 
-            if sub["frequency"].nunique() > 1:
-                beta, _intercept = np.polyfit(sub["frequency"], sub["avg_production"], 1)
-            else:
-                beta = float("nan")
-            betas.append((name, beta))
+    scatter_rows = []
+    betas = []
+    for name, log_col in visible_scatter_metrics:
+        sub = scatter_base_df[["mcdi", "avg_production", log_col]].rename(
+            columns={log_col: "frequency"}
+        )
+        sub["metric"] = name
+        scatter_rows.append(sub)
 
-        scatter_df = pd.concat(scatter_rows, ignore_index=True)
-        scatter_color_scale = alt.Scale(
-            domain=[name for name, _, _ in METRIC_DEFS], range=METRIC_COLORS
+        beta = standardized_beta(sub["frequency"], sub["avg_production"])
+        betas.append((name, beta))
+
+    scatter_df = pd.concat(scatter_rows, ignore_index=True)
+    scatter_color_scale = alt.Scale(
+        domain=[name for name, _, _ in METRIC_DEFS], range=METRIC_COLORS
+    )
+
+    points = (
+        alt.Chart(scatter_df)
+        .mark_circle(size=45, opacity=0.6)
+        .encode(
+            x=alt.X("frequency:Q", title="Log frequency"),
+            y=alt.Y("avg_production:Q", title="Avg. production"),
+            color=alt.Color("metric:N", title="Count type", scale=scatter_color_scale),
+            tooltip=["mcdi", "metric", "frequency", "avg_production"],
+        )
+    )
+    # drop the inherited per-point tooltip on the line layer so it never
+    # shadows a point's mcdi-word tooltip where the two overlap
+    regression_lines = (
+        points.transform_regression("frequency", "avg_production", groupby=["metric"])
+        .mark_line()
+        .encode(tooltip=alt.value(None))
+    )
+
+    beta_col, chart_col = st.columns([1, 4])
+    with beta_col:
+        st.caption("**Standardized β**")
+        st.caption("  \n".join(f"{name}: β = {beta:.6g}" for name, beta in betas))
+    with chart_col:
+        st.altair_chart(
+            (points + regression_lines).properties(width=700, height=450).interactive(),
+            width="content",
         )
 
-        points = (
-            alt.Chart(scatter_df)
-            .mark_circle(size=45, opacity=0.6)
-            .encode(
-                x=alt.X("frequency:Q", title="Log frequency (log1p)"),
-                y=alt.Y("avg_production:Q", title="Avg. production"),
-                color=alt.Color("metric:N", title="Count type", scale=scatter_color_scale),
-                tooltip=["mcdi", "metric", "frequency", "avg_production"],
-            )
-        )
-        # drop the inherited per-point tooltip on the line layer so it never
-        # shadows a point's mcdi-word tooltip where the two overlap
-        regression_lines = (
-            points.transform_regression("frequency", "avg_production", groupby=["metric"])
-            .mark_line()
-            .encode(tooltip=alt.value(None))
-        )
 
-        beta_col, chart_col = st.columns([1, 4])
-        with beta_col:
-            st.caption("**β (slope)**")
-            st.caption("  \n".join(f"{name}: β = {beta:.6g}" for name, beta in betas))
-        with chart_col:
-            st.altair_chart(
-                (points + regression_lines).properties(width=700, height=450).interactive(),
-                width="content",
-            )
+def page_bar_plot():
+    st.header("Summary statistics by MCDI word")
 
-st.header("Summary statistics by MCDI word")
+    st.sidebar.subheader("Bar plot filters")
+    filtered_df = counts_df.copy()
+    filtered_df = checkbox_list_filter(filtered_df, "category", "Category", st.sidebar, n_cols=2)
+    filtered_df = checkbox_list_filter(filtered_df, "grammar", "Grammar", st.sidebar, n_cols=1)
 
-with st.expander("MCDI word filter", expanded=False):
-    filtered_df = checkbox_list_filter(filtered_df, "mcdi", "MCDI word", st, n_cols=6, searchable=True)
+    st.sidebar.caption("Count ranges")
+    for col, label, default_min in [
+        ("total_alt_incl_count", "Total alt inclusive count", 1),
+        ("total_alt_excl_count", "Total alt exclusive count", 1),
+        ("base_incl_count", "Base inclusive count", 1),
+        ("base_excl_count", "Base exclusive count", 1),
+        ("avg_production", "Avg. production", None),
+    ]:
+        with st.sidebar:
+            filtered_df = numeric_range_filter(filtered_df, col, label, default_min=default_min)
 
-with st.expander(f"Filtered table ({len(filtered_df)} rows)"):
-    st.dataframe(filtered_df, width="stretch")
+    with st.expander(f"Filtered table ({len(filtered_df)} rows)"):
+        st.dataframe(filtered_df, width="stretch")
 
-if filtered_df.empty:
-    st.warning("No rows match the current filters.")
-else:
+    if filtered_df.empty:
+        st.warning("No rows match the current filters.")
+        return
+
     use_log = st.checkbox("Use log-transformed counts", value=False)
 
     active_col_for = {name: (log_col if use_log else raw_col) for name, raw_col, log_col in SORTABLE_DEFS}
@@ -286,9 +265,13 @@ else:
     for name, _, _ in SORTABLE_DEFS:
         sort_field_map[name] = active_col_for[name]
 
+    sort_options = list(sort_field_map.keys())
+    default_sort_label = "Total alt exclusive count"
     sort_col1, sort_col2, sort_col3 = st.columns([2, 1, 1])
     with sort_col1:
-        sort_label = st.selectbox("Sort groups by", list(sort_field_map.keys()))
+        sort_label = st.selectbox(
+            "Sort groups by", sort_options, index=sort_options.index(default_sort_label)
+        )
     with sort_col2:
         descending = st.checkbox(
             "Descending", value=sort_label != "MCDI word (A-Z)", key="sort_descending"
@@ -325,7 +308,7 @@ else:
     n_words = summary_df["mcdi"].nunique()
     y_max = bars_df["value"].max()
     n_panels = max(1, math.ceil(n_words / words_per_panel))
-    y_title = "Log frequency (log1p)" if use_log else "Frequency"
+    y_title = "Log frequency" if use_log else "Frequency"
 
     for panel_idx in range(n_panels):
         panel_words = mcdi_order[panel_idx * words_per_panel:(panel_idx + 1) * words_per_panel]
@@ -355,3 +338,46 @@ else:
         )
         st.altair_chart(chart, width="content")
 
+
+st.set_page_config(page_title="CHILDES-MCDI Counts", layout="wide")
+st.title("MCDI-CHILDES Counts")
+
+INTRO_CAPTION_LINES = [
+    f"Source: {COUNTS_PATH}",
+    "Each MCDI word here is displayed with four kinds of counts:",
+    "• Total alt inclusive count: counts a word and all its possible forms, double-counting compound words",
+    "• Total alt exclusive count: counts a word and all its possible forms, without double-counting compound words",
+    "• Base inclusive count: counts only the canonical form of each word, double-counting compounds",
+    "• Base exclusive count: counts only the canonical form of each word, without double-counting compounds",
+    "The \"Use log-transformed counts\" toggle (on the bar plot page) switches all of the above to their log-transformed values.",
+    "Four difference metrics are also available for sorting on the bar plot page:",
+    "• Alt diff: total alt inclusive − total alt exclusive",
+    "• Base diff: base inclusive − base exclusive",
+    "• Alt-base exclusive diff: total alt exclusive − base exclusive",
+    "• Alt-base inclusive diff: total alt inclusive − base inclusive",
+    "Toggling the log-transform option switches these diffs to their log-difference versions too.",
+]
+st.caption("  \n".join(INTRO_CAPTION_LINES))
+
+counts_by_age_df = load_counts()
+
+available_ages = sorted(counts_by_age_df["age at count"].unique().tolist())
+default_age = 24 if 24 in available_ages else available_ages[len(available_ages) // 2]
+
+pg = st.navigation([
+    st.Page(page_beta_trend, title="β by age", default=True),
+    st.Page(page_scatter, title="Production vs. frequency"),
+    st.Page(page_bar_plot, title="Summary bar plot"),
+])
+
+st.sidebar.header("Global filters")
+st.sidebar.caption("Apply on every page.")
+selected_age = st.sidebar.selectbox(
+    "Age cutoff (months)", available_ages, index=available_ages.index(default_age)
+)
+counts_df = counts_by_age_df[counts_by_age_df["age at count"] == selected_age].drop(columns="age at count")
+
+with st.sidebar.expander("MCDI word filter", expanded=False):
+    counts_df = checkbox_list_filter(counts_df, "mcdi", "MCDI word", st, n_cols=2, searchable=True)
+
+pg.run()
