@@ -182,3 +182,4 @@ cython_debug/
 .pixi/*
 !.pixi/config.toml
 raw_data/childes.csv
+data/childes.csv

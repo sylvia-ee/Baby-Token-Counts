@@ -8,10 +8,12 @@ glossary_path = "/Users/se/Projects/Baby-Token-Counts/data/glossary.csv"
 counts_path = "/Users/se/Projects/Baby-Token-Counts/data/counts.csv"
 counts_all_incl_path = "/Users/se/Projects/Baby-Token-Counts/data/counts_all_incl.csv"
 
-# 0. only return the id, stem, speaker_id, target_child_id, transcript_id cols
+# 0. only return the id, stem, speaker_id, target_child_id, transcript_id cols,
+# restricted to rows for children 24 months old or younger
 childes_df = pd.read_csv(childes_path)[
-    ["id", "stem", "speaker_id", "target_child_id", "transcript_id"]
+    ["id", "stem", "speaker_id", "target_child_id", "transcript_id", "target_child_age"]
 ]
+childes_df = childes_df[childes_df["target_child_age"] <= 24.0]
 glossary_df = pd.read_csv(glossary_path)
 
 # 1. take the "stem" column, convert all to string type and lowercase
