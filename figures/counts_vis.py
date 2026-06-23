@@ -372,14 +372,17 @@ pg = st.navigation([
     st.Page(page_bar_plot, title="Summary bar plot"),
 ])
 
-st.sidebar.header("Global filters")
-st.sidebar.caption("Apply on every page.")
-selected_age = st.sidebar.selectbox(
-    "Age cutoff (months)", available_ages, index=available_ages.index(default_age)
-)
-counts_df = counts_by_age_df[counts_by_age_df["age at count"] == selected_age].drop(columns="age at count")
+if pg.title != "β by age":
+    st.sidebar.header("Filters")
+    st.sidebar.caption("Apply to this page and the other non-trend page.")
+    selected_age = st.sidebar.selectbox(
+        "Age cutoff (months)", available_ages, index=available_ages.index(default_age)
+    )
+    counts_df = counts_by_age_df[counts_by_age_df["age at count"] == selected_age].drop(
+        columns="age at count"
+    )
 
-with st.sidebar.expander("MCDI word filter", expanded=False):
-    counts_df = checkbox_list_filter(counts_df, "mcdi", "MCDI word", st, n_cols=2, searchable=True)
+    with st.sidebar.expander("MCDI word filter", expanded=False):
+        counts_df = checkbox_list_filter(counts_df, "mcdi", "MCDI word", st, n_cols=2, searchable=True)
 
 pg.run()
