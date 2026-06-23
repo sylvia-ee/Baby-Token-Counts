@@ -1,9 +1,13 @@
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-childes_path = "/Users/se/Projects/Baby-Token-Counts/raw_data/childes.csv"
-age_histogram_path = "/Users/se/Projects/Baby-Token-Counts/figures/target_child_age_histogram.png"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+childes_path = PROJECT_ROOT / "raw_data" / "childes.csv"
+age_histogram_path = PROJECT_ROOT / "figures" / "target_child_age_histogram.png"
 
 # every read is restricted to rows for children 24 months old or younger,
 # matching the filter applied in childes_preprocess.py

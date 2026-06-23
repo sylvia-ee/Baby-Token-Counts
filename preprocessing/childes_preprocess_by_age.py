@@ -1,12 +1,15 @@
 from collections import Counter
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
-childes_path = "/Users/se/Projects/Baby-Token-Counts/raw_data/childes.csv"
-glossary_path = "/Users/se/Projects/Baby-Token-Counts/data/glossary.csv"
-avgs_path = "/Users/se/Projects/Baby-Token-Counts/raw_data/mcdi_prod_avgs_16-30.csv"
-counts_by_age_path = "/Users/se/Projects/Baby-Token-Counts/data/counts_by_age.csv"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+childes_path = PROJECT_ROOT / "raw_data" / "childes.csv"
+glossary_path = PROJECT_ROOT / "data" / "glossary.csv"
+avgs_path = PROJECT_ROOT / "raw_data" / "mcdi_prod_avgs_16-30.csv"
+counts_by_age_path = PROJECT_ROOT / "data" / "counts_by_age.csv"
 
 AGES = range(16, 31)
 

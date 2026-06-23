@@ -1,6 +1,10 @@
 import re
+from pathlib import Path
+
 from string_ops import *
 import pandas as pd
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 GRAMMAR_GENERATORS = {
     "singular_noun": singular_generator,
@@ -115,12 +119,12 @@ def generate_alts(df):
     return df
 
 
-# 0. load in dfs from paths 
-mcdi_ibi_path = "/Users/se/Projects/Baby-Token-Counts/raw_data/mcdi_ibi.csv"
-cat_excl_path = "/Users/se/Projects/Baby-Token-Counts/inclusions_and_exclusions/category-exclusions_set1.csv"
-word_excl_path = "/Users/se/Projects/Baby-Token-Counts/inclusions_and_exclusions/word-exclusions_set1.csv"
-word_incl_path = "/Users/se/Projects/Baby-Token-Counts/inclusions_and_exclusions/word-inclusions_set1.csv"
-manual_grammar_path = "/Users/se/Projects/Baby-Token-Counts/inclusions_and_exclusions/manual_grammar_set1.csv"
+# 0. load in dfs from paths
+mcdi_ibi_path = PROJECT_ROOT / "raw_data" / "mcdi_ibi.csv"
+cat_excl_path = PROJECT_ROOT / "inclusions_and_exclusions" / "category-exclusions_set1.csv"
+word_excl_path = PROJECT_ROOT / "inclusions_and_exclusions" / "word-exclusions_set1.csv"
+word_incl_path = PROJECT_ROOT / "inclusions_and_exclusions" / "word-inclusions_set1.csv"
+manual_grammar_path = PROJECT_ROOT / "inclusions_and_exclusions" / "manual_grammar_set1.csv"
 
 mcdi_ibi_df = pd.read_csv(mcdi_ibi_path)
 cat_excl_df = pd.read_csv(cat_excl_path)
@@ -160,5 +164,5 @@ mcdi_ibi_df = apply_word_incl(word_incl_path, mcdi_ibi_df)
 mcdi_ibi_df = generate_alts(mcdi_ibi_df)
 
 mcdi_ibi_df = mcdi_ibi_df.sort_values(by="base")
-mcdi_ibi_df.to_csv("data/glossary.csv", index=False)
+mcdi_ibi_df.to_csv(PROJECT_ROOT / "data" / "glossary.csv", index=False)
 

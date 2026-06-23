@@ -1,12 +1,16 @@
 from collections import Counter
+from pathlib import Path
+
 import numpy as np
 import pandas as pd
 
-childes_path = "/Users/se/Projects/Baby-Token-Counts/raw_data/childes.csv"
-childes_txt_path = "/Users/se/Projects/Baby-Token-Counts/data/childes.txt"
-glossary_path = "/Users/se/Projects/Baby-Token-Counts/data/glossary.csv"
-counts_path = "/Users/se/Projects/Baby-Token-Counts/data/counts.csv"
-counts_all_incl_path = "/Users/se/Projects/Baby-Token-Counts/data/counts_all_incl.csv"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+childes_path = PROJECT_ROOT / "raw_data" / "childes.csv"
+childes_txt_path = PROJECT_ROOT / "data" / "childes.txt"
+glossary_path = PROJECT_ROOT / "data" / "glossary.csv"
+counts_path = PROJECT_ROOT / "data" / "counts.csv"
+counts_all_incl_path = PROJECT_ROOT / "data" / "counts_all_incl.csv"
 
 # 0. only return the id, stem, speaker_id, target_child_id, transcript_id cols,
 # restricted to rows for children 24 months old or younger

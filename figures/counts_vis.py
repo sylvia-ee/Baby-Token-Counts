@@ -1,11 +1,13 @@
 import math
+from pathlib import Path
 
 import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-COUNTS_PATH = "/Users/se/Projects/Baby-Token-Counts/data/counts_by_age.csv"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+COUNTS_PATH = PROJECT_ROOT / "data" / "counts_by_age.csv"
 
 # (canonical label, raw count column, log-transformed column) — the canonical
 # label is used for color/sort identity so it stays stable when the log toggle flips
