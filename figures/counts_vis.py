@@ -114,10 +114,8 @@ def checkbox_list_filter(df, col, label, container, n_cols=2, searchable=False):
 def page_beta_trend():
     st.header("Standardized β by age cutoff")
     st.caption(
-        "For each age cutoff, refits the avg. production vs. log frequency regression "
-        "(same as the scatter plot page) and tracks how standardized β moves as more "
-        "CHILDES data is included. Standardizing (z-scoring both variables before fitting) "
-        "puts every age cutoff and count type on the same scale, so the betas are comparable."
+       "Correlations for log frequency vs. production (MCDI). Betas have been standardized,"
+    "so interpret betas as comparable. Note that betas reflect cumulative input up to that age"
     )
 
     beta_trend_rows = []
@@ -151,8 +149,8 @@ def page_beta_trend():
 
 
 def page_scatter():
-    st.header("Avg. production vs. frequency by count type")
-    st.caption("Reflects the age cutoff and MCDI word filter from the sidebar.")
+    st.header("Avg. production vs. frequency by counting method")
+    st.caption("See settings on sidebar, this is age segregated. So only shows one age at a time.")
 
     if counts_df.empty:
         st.warning("No data available.")
@@ -222,6 +220,8 @@ def page_scatter():
 
 def page_bar_plot():
     st.header("Summary statistics by MCDI word")
+    st.caption("See settings on sidebar, this is age segregated. So only shows one age at a time. Also note" \
+    "           that if you choose to apply log counts, that sorting by any diff will be the log diff.")
 
     st.sidebar.subheader("Bar plot filters")
     filtered_df = counts_df.copy()
